@@ -106,6 +106,19 @@ class ModuleGraph(nn.ModuleDict):
                 common_keys = module1._output_batch_keys.intersection(module2._input_batch_keys)
                 for key in common_keys:
                     graph.add_edge(name1, name2, key=key)
+        
+        # Sort nodes by topological order
+        sorted_nodes = self._sort_keys(graph)
+
+        # Add a final dummy node
+        final_node_name = "output"
+        graph.add_node(final_node_name)
+        last_node_name = sorted_nodes[-1]  # Get the name of the last node
+
+        # Add edges from the last node to the final dummy node for all output keys of the last node
+        last_module = modules[last_node_name]
+        for key in last_module._output_batch_keys:
+            graph.add_edge(last_node_name, final_node_name, key=key)
         return graph
 
     @staticmethod
@@ -136,7 +149,7 @@ class ModuleGraph(nn.ModuleDict):
         pos = nx.planar_layout(self.module_graph)
 
         # draw the nodes as small black dots and the labels in larger text
-        nx.draw_networkx_nodes(self.module_graph, pos, node_size=50, node_color='black', ax=ax)
+        nx.draw_networkx_nodes(self.module_graph, pos, node_size=50, node_color='blue', ax=ax)
         
 
         # draw the edges as thicker lines with arrows at the end
@@ -144,10 +157,10 @@ class ModuleGraph(nn.ModuleDict):
                             arrowsize=10, edge_cmap=plt.cm.Blues, width=2, ax=ax)
         
         # offset the label position to avoid overlap with nodes
-        label_pos = {k: (v[0], v[1]+0.05) for k, v in pos.items()}  # Adjust second value to offset labels
+        label_pos = {k: (v[0]+0.1, v[1]+0.05) for k, v in pos.items()}  # Adjust second value to offset labels
 
         # draw labels in larger text
-        nx.draw_networkx_labels(self.module_graph, label_pos, font_size=20, ax=ax)
+        nx.draw_networkx_labels(self.module_graph, label_pos, font_size=20, ax=ax, font_color='blue')
     
         
         # draw edge labels
