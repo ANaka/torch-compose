@@ -1,11 +1,13 @@
-from torch import nn
-import torch
-from typing import Optional, Union, List, Dict, Tuple
-import networkx as nx
-from matplotlib import pyplot as plt
-from graphlib import TopologicalSorter
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections import OrderedDict
+from graphlib import TopologicalSorter
+from typing import Dict, Tuple, Union
+
+import networkx as nx
+import torch
+from matplotlib import pyplot as plt
+from torch import nn
+
 
 class DirectedModule(nn.Module):
     def __init__(
@@ -89,6 +91,10 @@ class DirectedModule(nn.Module):
             return set(self.output_keys.values())
         else:
             return set(self.output_keys)
+        
+    @abstractmethod
+    def forward(self, *args, **kwargs):
+        raise NotImplementedError("forward method must be implemented in subclass")
 
 
 class ModuleGraph(nn.ModuleDict):
