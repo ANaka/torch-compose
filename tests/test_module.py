@@ -53,15 +53,37 @@ def test_tensor_output():
 def test_module_graph():
     g = ModuleGraph(
         modules={
+            # m0 tests a DirectedModule that accepts single string input, performs a simple operation and returns a dict output
             'm0': DictOutput(input_keys=['x0'], output_keys = {'x': 'x1'}),
+
+            # m1 tests a DirectedModule that accepts a dict input and returns a tuple output
             'm1': TupleOutput(input_keys=['x1'], output_keys = ['x2', 'x3']),
+
+            # m2 tests a DirectedModule that accepts a tuple input and returns a Tensor output
             'm2': TensorOutput(input_keys=['x3'], output_keys = ['x4']),
+
+            # cat_layer0 tests a DirectedModule that accepts multiple inputs and concatenates them to return a single output
             'cat_layer0': CatModule(input_keys=['x2', 'x4'], output_keys = ['x5']),
+
+            # m3 tests a DirectedModule that accepts single string input and output and performs a simple operation
             'm3': TensorOutput(input_keys='x5', output_keys = 'x6'),
+
+            # m4 tests a DirectedModule that accepts single string input and returns multiple outputs as a dictionary
             'm4': DictMultiOutput(input_keys='x6', output_keys = {'x': 'x7', 'y': 'x8'}),
+
+            # m5 tests a DirectedModule that accepts a list of input keys and returns a dictionary output
             'm5': DictMultiOutput(input_keys=['x8'], output_keys = {'x': 'x9',}),
+
+            # m6 tests a DirectedModule that accepts a dict input and returns a list output
             'm6': DictMultiOutput(input_keys={'x9': 'x'}, output_keys = ['x']),
+
+            # cat_layer1 tests a DirectedModule that accepts multiple inputs (both single string and list) and concatenates them
             'cat_layer1': CatModule(input_keys=['x7', 'x', 'x8'], output_keys = ['x10']),
             })
+
+    # The forward pass is applied on the input tensor. It should pass through the graph and be transformed according to the defined modules.
     new_batch = g.forward(batch = {'x0': torch.tensor(1.).unsqueeze(0)})
+
+    # Check if the output has the expected key, which indicates that all modules have worked correctly
     assert 'x10' in new_batch
+
