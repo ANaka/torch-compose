@@ -10,6 +10,16 @@ from torch import nn
 
 
 class DirectedModule(nn.Module):
+    """
+    An abstract base class for a module that takes a set of inputs and produces a set of outputs.
+    The module's forward function needs to be implemented by any subclass. This module can be integrated
+    in a module graph where data is flowing from one module to another.
+
+    Args:
+        input_keys: The keys used to extract inputs from the batch.
+        output_keys: The keys used to add outputs to the batch.
+    """
+
     def __init__(
         self,
         input_keys: Union[str, Tuple, Dict] = None,  # keys to extract from batch
@@ -18,29 +28,44 @@ class DirectedModule(nn.Module):
     ):
         super().__init__()
 
+        # If input_keys is a single string, convert it to a list for consistency
         if isinstance(input_keys, str):
             input_keys = [input_keys]
+
+        # If input_keys is not a dict, convert it to a tuple to handle multiple inputs
         try:
             input_keys.keys()
         except AttributeError:
-            input_keys = tuple(
-                input_keys
-            )  # if input_keys is not a dict, assume it is a collection and convert to tuple
+            input_keys = tuple(input_keys)
+
         self.input_keys = input_keys
 
+        # If output_keys is a single string, convert it to a list for consistency
         if isinstance(output_keys, str):
             output_keys = [output_keys]
+
+        # If output_keys is not a dict, convert it to a tuple to handle multiple outputs
         try:
             output_keys.keys()
         except AttributeError:
-            output_keys = tuple(
-                output_keys
-            )  # if output_keys is not a dict, assume it is a collection and convert to tuple
+            output_keys = tuple(output_keys)
+
         self.output_keys = output_keys
 
     def _graph_forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Runs the forward pass for the module, using the specified input and output keys.
+
+        Args:
+            batch: The batch of data to be processed.
+
+        Returns:
+            The processed batch of data.
+        """
+
         outputs = self._get_forward_outputs(batch)
 
+        # Determine how to process the outputs based on the type of output keys
         if isinstance(self.output_keys, dict):
             self._process_dict_outputs(batch, outputs)
         elif isinstance(self.output_keys, tuple):
@@ -49,24 +74,50 @@ class DirectedModule(nn.Module):
         return batch
 
     def _get_forward_outputs(self, batch):
+        """
+        Get outputs from the forward method by passing inputs based on their keys.
+
+        Args:
+            batch: The batch of data to be processed.
+
+        Returns:
+            The outputs of the forward method.
+        """
+
         if isinstance(self.input_keys, Dict):
+            # Extract inputs from batch using dict of keys and pass as keyword arguments to the forward method
             inputs = {
                 internal_key: batch.get(batch_key, None)
                 for batch_key, internal_key in self.input_keys.items()
             }
             return self.forward(**inputs)
         else:  # self.input_keys is a Tuple
+            # Extract inputs from batch using tuple of keys and pass as positional arguments to the forward method
             inputs = [batch.get(batch_key, None) for batch_key in self.input_keys]
             return self.forward(*inputs)
 
     def _process_dict_outputs(self, batch, outputs):
-        assert isinstance(
-            outputs, Dict
-        )  # if output_keys is dict, assume we want to remap keys before adding to batch
+        """
+        Processes outputs that are in the form of a dictionary.
+
+        Args:
+            batch: The batch of data to be processed.
+            outputs: The outputs of the forward method.
+        """
+
+        assert isinstance(outputs, Dict)
         for internal_key, batch_key in self.output_keys.items():
             batch[batch_key] = outputs[internal_key]
 
     def _process_tuple_outputs(self, batch, outputs):
+        """
+        Processes outputs that are in the form of a tuple.
+
+        Args:
+            batch: The batch of data to be processed.
+            outputs: The outputs of the forward method.
+        """
+
         if isinstance(outputs, Dict):
             for internal_key, batch_key in zip(self.output_keys, outputs.keys()):
                 batch[batch_key] = outputs[internal_key]
@@ -79,6 +130,8 @@ class DirectedModule(nn.Module):
 
     @property
     def _input_batch_keys(self):
+        """Returns the set of input batch keys"""
+
         if isinstance(self.input_keys, dict):
             return set(self.input_keys.keys())
         else:
@@ -86,6 +139,8 @@ class DirectedModule(nn.Module):
 
     @property
     def _output_batch_keys(self):
+        """Returns the set of output batch keys"""
+
         if isinstance(self.output_keys, dict):
             return set(self.output_keys.values())
         else:
@@ -93,10 +148,20 @@ class DirectedModule(nn.Module):
 
     @abstractmethod
     def forward(self, *args, **kwargs):
+        """
+        Defines the computation performed at every call. Should be overridden by all subclasses.
+        """
         raise NotImplementedError("forward method must be implemented in subclass")
 
 
 class ModuleGraph(nn.ModuleDict):
+    """
+    This class defines a graph of DirectedModules, where each module can take as input the output of another module.
+
+    Args:
+        modules: A dictionary of DirectedModule, with keys as the module names and values as the module instances.
+    """
+
     def __init__(self, modules: Dict[str, "DirectedModule"] = None):
         modules = modules or {}
         sorted_modules, graph = self._build_and_sort_graph(modules)
@@ -104,12 +169,33 @@ class ModuleGraph(nn.ModuleDict):
         self.module_graph = graph
 
     def _build_and_sort_graph(self, modules):
+        """
+        Builds and sorts the graph of DirectedModules according to their dependencies.
+
+        Args:
+            modules: A dictionary of DirectedModule.
+
+        Returns:
+            A tuple of sorted modules and the graph of modules.
+        """
+
         graph = self._build_graph(modules)
         sorted_keys = self._sort_keys(graph)
         sorted_modules = self._create_sorted_modules(sorted_keys, modules)
         return sorted_modules, graph
 
     def _create_sorted_modules(self, sorted_keys, modules):
+        """
+        Creates an ordered dictionary of modules according to the topological order.
+
+        Args:
+            sorted_keys: The keys sorted in topological order.
+            modules: A dictionary of DirectedModule.
+
+        Returns:
+            An ordered dictionary of modules.
+        """
+
         sorted_modules = OrderedDict()
         for key in sorted_keys:
             if key in modules:
@@ -117,6 +203,16 @@ class ModuleGraph(nn.ModuleDict):
         return sorted_modules
 
     def _build_graph(self, modules):
+        """
+        Builds the graph of DirectedModules.
+
+        Args:
+            modules: A dictionary of DirectedModule.
+
+        Returns:
+            The graph of modules.
+        """
+
         graph = nx.DiGraph()
         for name, module in modules.items():
             graph.add_node(name, module=module)
@@ -144,15 +240,39 @@ class ModuleGraph(nn.ModuleDict):
 
     @staticmethod
     def _sort_keys(graph):
+        """
+        Sorts the keys in the graph in topological order.
+
+        Args:
+            graph: The graph of modules.
+
+        Returns:
+            A list of keys in topological order.
+        """
+
         graph_dict = {node: set(graph.predecessors(node)) for node in graph.nodes()}
         return list(TopologicalSorter(graph_dict).static_order())
 
     def forward(self, batch: dict):
+        """
+        Runs the forward pass for all modules in the graph in topological order.
+
+        Args:
+            batch: The batch of data to be processed.
+
+        Returns:
+            The processed batch of data.
+        """
+
         for module_name, module in self.items():
             batch = module._graph_forward(batch)
         return batch
 
     def show_graph(self):
+        """
+        Shows the graph of modules using networkx and matplotlib.
+        """
+
         f, ax = plt.subplots(figsize=(12, 10))
 
         # use a spring layout to spread the nodes out
