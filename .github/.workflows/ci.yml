@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest,] #  windows-latest
+        python-version: [3.8, 3.10]
+        pytorch-version: [1.7, 1.13, 2.0]  # Adjust the versions as needed
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install PyTorch
+        run: pip install torch==${{ matrix.pytorch-version }} -f https://download.pytorch.org/whl/torch_stable.html
+
+      - name: Install Poetry
+        run: |
+          if [ "$runner.os" == "Windows" ]; then
+            pip install poetry
+          else
+            poetry_version=$(python -c "import sys; print(f'poetry=={sys.version_info.major}.{sys.version_info.minor}')")
+            pip install "$poetry_version"
+          fi
+
+      - name: Install project dependencies
+        run: poetry install
+
+      - name: Run tests
+        run: poetry run pytest
