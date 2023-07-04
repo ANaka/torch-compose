@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from collections import OrderedDict
 from graphlib import TopologicalSorter
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Callable
 
 import networkx as nx
 import torch
@@ -24,6 +24,7 @@ class DirectedModule(nn.Module):
         self,
         input_keys: Union[str, Tuple, Dict] = None,  # keys to extract from batch
         output_keys: Union[str, Tuple, Dict] = None,  # keys to add to batch
+        forward_function: Callable = None,  # function to run on batch
         **kwargs,
     ):
         super().__init__()
@@ -51,6 +52,11 @@ class DirectedModule(nn.Module):
             output_keys = tuple(output_keys)
 
         self.output_keys = output_keys
+        
+        if forward_function is not None:
+            self.forward = forward_function
+        else:
+            self.forward = self._placeholder_forward
 
     def _graph_forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
@@ -146,8 +152,7 @@ class DirectedModule(nn.Module):
         else:
             return set(self.output_keys)
 
-    @abstractmethod
-    def forward(self, *args, **kwargs):
+    def _placeholder_forward(self, *args, **kwargs):
         """
         Defines the computation performed at every call. Should be overridden by all subclasses.
         """
