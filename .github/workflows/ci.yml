@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest] # windows-latest
-        python-version: [3.8, 3.10]
+        python-version: [3.8, python3.10]
         pytorch-version: [1.7, 1.13, 2.0]  # Adjust the versions as needed
 
     steps:
