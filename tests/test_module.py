@@ -1,4 +1,3 @@
-import pytest
 import torch
 from torch_compose.module import DirectedModule, ModuleGraph
 
