@@ -30,14 +30,17 @@ jobs:
       - name: Install PyTorch
         run: pip install torch==${{ matrix.pytorch-version }} -f https://download.pytorch.org/whl/torch_stable.html
 
-      - name: Install Poetry
-        run: |
-          if [ "$runner.os" == "Windows" ]; then
-            pip install poetry
-          else
-            poetry_version=$(python -c "import sys; print(f'poetry=={sys.version_info.major}.{sys.version_info.minor}')")
-            pip install "$poetry_version"
-          fi
+      - name: cache poetry install
+        uses: actions/cache@v2
+        with:
+          path: ~/.local
+          key: poetry-1.5.1
+
+      - uses: snok/install-poetry@v1
+        with:
+          version: 1.5.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
       - name: Install project dependencies
         run: poetry install
