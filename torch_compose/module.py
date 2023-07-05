@@ -24,7 +24,7 @@ class DirectedModule(nn.Module):
         self,
         input_keys: Union[str, Tuple, Dict] = None,  # keys to extract from batch
         output_keys: Union[str, Tuple, Dict] = None,  # keys to add to batch
-        forward_function: Callable = None,  # function to run on batch
+        forward: Callable = None,  # function/method to point to
         **kwargs,
     ):
         super().__init__()
@@ -53,8 +53,8 @@ class DirectedModule(nn.Module):
 
         self.output_keys = output_keys
         
-        if forward_function is not None:
-            self.forward = forward_function
+        if forward is not None:
+            self.forward = forward
         else:
             self.forward = self._placeholder_forward
 
