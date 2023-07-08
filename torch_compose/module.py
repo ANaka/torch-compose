@@ -1,7 +1,6 @@
-from abc import abstractmethod
 from collections import OrderedDict
 from graphlib import TopologicalSorter
-from typing import Dict, Tuple, Union, Callable
+from typing import Callable, Dict, Tuple, Union
 
 import networkx as nx
 import torch
@@ -15,6 +14,11 @@ class DirectedModule(nn.Module):
     The module's forward function needs to be implemented by any subclass. This module can be integrated
     in a module graph where data is flowing from one module to another.
 
+    3 ways to play:
+    1. Pass in a module argument to wrap a module
+    2. Pass in a forward argument to point to a function/method
+    3. Subclass or use as a mixin and define a forward method
+
     Args:
         input_keys: The keys used to extract inputs from the batch.
         output_keys: The keys used to add outputs to the batch.
@@ -24,39 +28,33 @@ class DirectedModule(nn.Module):
         self,
         input_keys: Union[str, Tuple, Dict] = None,  # keys to extract from batch
         output_keys: Union[str, Tuple, Dict] = None,  # keys to add to batch
-        forward_function: Callable = None,  # function to run on batch
+        module: nn.Module = None,  # module to wrap
+        forward: Callable = None,  # function/method to point to
         **kwargs,
     ):
         super().__init__()
 
-        # If input_keys is a single string, convert it to a list for consistency
-        if isinstance(input_keys, str):
-            input_keys = [input_keys]
+        self.input_keys = self._process_keys(input_keys)
+        self.output_keys = self._process_keys(output_keys)
 
-        # If input_keys is not a dict, convert it to a tuple to handle multiple inputs
-        try:
-            input_keys.keys()
-        except AttributeError:
-            input_keys = tuple(input_keys)
+        assert (
+            module is None or forward is None
+        ), "Only one of module or forward can be specified"
 
-        self.input_keys = input_keys
-
-        # If output_keys is a single string, convert it to a list for consistency
-        if isinstance(output_keys, str):
-            output_keys = [output_keys]
-
-        # If output_keys is not a dict, convert it to a tuple to handle multiple outputs
-        try:
-            output_keys.keys()
-        except AttributeError:
-            output_keys = tuple(output_keys)
-
-        self.output_keys = output_keys
-        
-        if forward_function is not None:
-            self.forward = forward_function
-        else:
-            self.forward = self._placeholder_forward
+        if module is not None:
+            self.add_module("node", module)
+            self.forward = module.forward
+        elif forward is not None:
+            self.forward = forward
+            
+    def _process_keys(self, keys):
+        # If keys is a single string, convert it to a list for consistency
+        if isinstance(keys, str):
+            keys = [keys]
+        # If keys is not a dict, convert it to a tuple to handle multiple inputs/outputs
+        if not isinstance(keys, dict):
+            keys = tuple(keys)
+        return keys
 
     def _graph_forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
@@ -151,12 +149,6 @@ class DirectedModule(nn.Module):
             return set(self.output_keys.values())
         else:
             return set(self.output_keys)
-
-    def _placeholder_forward(self, *args, **kwargs):
-        """
-        Defines the computation performed at every call. Should be overridden by all subclasses.
-        """
-        raise NotImplementedError("forward method must be implemented in subclass")
 
 
 class ModuleGraph(nn.ModuleDict):
